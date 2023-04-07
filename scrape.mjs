@@ -5,10 +5,13 @@ import fetch from 'node-fetch'; // for use in Node.js
 
 async function getDolphinLivingFlats() {
   try {
-    const url = 'https://www.dolphinliving.com/find-a-home/available-homes';
-    const response = await fetch(url);
-    const body = await response.text();
-    const $ = load(body);
+    const dolphinUrl = 'https://www.dolphinliving.com/find-a-home/available-homes';
+    const hfWestminsterUrl = 'https://www.homesforwestminster.co.uk/category/property-for-rent';
+
+    const dolphinRes = await fetch(dolphinUrl);
+    const hfWestminsterRes = await fetch(hfWestminsterUrl);
+
+    const [dolphinData, hfWestminsterData] = await Promise.all([dolphinRes.text(), hfWestminsterRes.text()])
 
     const allFlats = [];
 
