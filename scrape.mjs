@@ -1,35 +1,46 @@
 import { load } from 'cheerio';
-import fetch from 'node-fetch'; // for use in Node.js
+import fetch from 'node-fetch';
 
-// getData();
-
-async function getDolphinLivingFlats() {
+async function getAvailableFlats() {
   try {
-    const dolphinUrl = 'https://www.dolphinliving.com/find-a-home/available-homes';
-    const hfWestminsterUrl = 'https://www.homesforwestminster.co.uk/category/property-for-rent';
+    const dolphinUrl =
+      'https://www.dolphinliving.com/find-a-home/available-homes';
+    const hfWestminsterUrl =
+      'https://www.homesforwestminster.co.uk/category/property-for-rent';
 
     const dolphinRes = await fetch(dolphinUrl);
     const hfWestminsterRes = await fetch(hfWestminsterUrl);
 
-    const [dolphinData, hfWestminsterData] = await Promise.all([dolphinRes.text(), hfWestminsterRes.text()])
+    const [dolphinBody, hfWestminsterBody] = await Promise.all([
+      dolphinRes.text(),
+      hfWestminsterRes.text(),
+    ]);
 
-    const allFlats = [];
+    const $dolphin = load(dolphinBody);
+    const $hfWestminster = load(hfWestminsterBody);
 
-    $('.views-row').each((i, el) => {
-      const flatInfo =         $(el)
-      .text()
-      .split('\n')
-      .map((str) => str.trim())
-      .filter(Boolean)
-      allFlats.push(flatInfo);
+    const dolphinFlats = {'dolphin-flats' : parseHTML($dolphin)};
+    const westminsterFlats = {'westminster-flats' : parseHTML($hfWestminster)};
 
-    });
-
-    console.log(allFlats);
-
+    console.log(dolphinFlats);
+    console.log(westminsterFlats);
   } catch (error) {
     console.error(error);
   }
 }
 
-getDolphinLivingFlats();
+function parseHTML(body) {
+  const allFlats = [];
+
+  body('.views-row').each((i, el) => {
+    const flatInfo = body(el)
+      .text()
+      .split('\n')
+      .map((str) => str.trim())
+      .filter(Boolean);
+    allFlats.push(flatInfo);
+  });
+  return allFlats;
+}
+
+getAvailableFlats();
