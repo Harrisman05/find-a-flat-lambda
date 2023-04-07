@@ -43,4 +43,4 @@ function parseHTML(body) {
   return allFlats;
 }
 
-getAvailableFlats();
+export { getAvailableFlats };
