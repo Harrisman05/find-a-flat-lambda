@@ -52,21 +52,19 @@ function parseHTML(body) {
 
 async function createTableEntry(client, tableName, flats) {
   const id = uuidv4();
-  console.log("trying");
   const params = {
     TableName: tableName,
     Item: {
-      flatID: { S: "1" },
-      content: { S: "Test" },
+      flatID: { S: id },
+      content: { S: JSON.stringify(flats) },
     },
   };
   try {
     await client.send(new PutItemCommand(params));
     console.log(`Item ${id} created in ${tableName}`);
-    console.log('zip right');
   } catch (err) {
     console.error(`Unable to create item in ${tableName}: ${err}`);
   }
 }
-
+getAvailableFlats();
 export { getAvailableFlats };
