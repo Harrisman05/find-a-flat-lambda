@@ -1,5 +1,10 @@
 import { load } from 'cheerio';
 import fetch from 'node-fetch';
+import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb';
+import { v4 as uuidv4 } from 'uuid';
+
+const client = new DynamoDBClient({ region: 'eu-north-1' });
+const tableName = 'westminster_flats_table';
 
 async function getAvailableFlats() {
   try {
@@ -19,11 +24,13 @@ async function getAvailableFlats() {
     const $dolphin = load(dolphinBody);
     const $hfWestminster = load(hfWestminsterBody);
 
-    const dolphinFlats = {'dolphin-flats' : parseHTML($dolphin)};
-    const westminsterFlats = {'westminster-flats' : parseHTML($hfWestminster)};
+    const dolphinFlats = { 'dolphin-flats': parseHTML($dolphin) };
+    const westminsterFlats = { 'westminster-flats': parseHTML($hfWestminster) };
 
     console.log(dolphinFlats);
     console.log(westminsterFlats);
+
+    await createTableEntry(client, tableName, dolphinFlats);
   } catch (error) {
     console.error(error);
   }
@@ -41,6 +48,25 @@ function parseHTML(body) {
     allFlats.push(flatInfo);
   });
   return allFlats;
+}
+
+async function createTableEntry(client, tableName, flats) {
+  const id = uuidv4();
+  console.log("trying");
+  const params = {
+    TableName: tableName,
+    Item: {
+      flatID: { S: "1" },
+      content: { S: "Test" },
+    },
+  };
+  try {
+    await client.send(new PutItemCommand(params));
+    console.log(`Item ${id} created in ${tableName}`);
+    console.log('zip right');
+  } catch (err) {
+    console.error(`Unable to create item in ${tableName}: ${err}`);
+  }
 }
 
 export { getAvailableFlats };
