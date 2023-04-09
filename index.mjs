@@ -1,6 +1,6 @@
 import { load } from 'cheerio';
 import fetch from 'node-fetch';
-import { DynamoDBClient, PutItemCommand, ScanCommand, TableAlreadyExistsException } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient, PutItemCommand, ScanCommand, GetItemCommand } from '@aws-sdk/client-dynamodb';
 import { v4 as uuidv4 } from 'uuid';
 
 const client = new DynamoDBClient({ region: 'eu-north-1' });
@@ -8,6 +8,9 @@ const tableName = 'westminster_flats_table';
 
 async function getAvailableFlats() {
   try {
+    const dolphinID = 'dolphin-flats';
+    const westminsterID = 'westminster-flats';
+
     const dolphinUrl =
       'https://www.dolphinliving.com/find-a-home/available-homes';
     const hfWestminsterUrl =
@@ -27,15 +30,17 @@ async function getAvailableFlats() {
     const dolphinFlatsWeb = JSON.stringify({ 'dolphin-flats': parseHTML($dolphin) });
     const westminsterFlatsWeb = JSON.stringify({ 'westminster-flats': parseHTML($hfWestminster) });
 
+    /////////////////////////////////////////////////////////////////////////////////
+
+    await checkEmptyTable(client, tableName, [dolphinFlatsWeb, westminsterFlatsWeb]);
+
+    const dolphinFlatsDB = await readTableItem(client, tableName, dolphinID);
+    const westminsterFlatsDB = await readTableItem(client, tableName, westminsterID);
+    
     console.log(dolphinFlatsWeb);
     console.log(westminsterFlatsWeb);
-
-    // await createTableEntry(client, tableName, dolphinFlats);
-    // await createTableEntry(client, tableName, westminsterFlats);
-
-    const [dolphinFlatsDB, westminsterFlatsDB] = await readTableItems(client, tableName);
-    console.log(dolphinFlatsWeb);
-    console.log(westminsterFlatsWeb);
+    console.log(dolphinFlatsDB);
+    console.log(westminsterFlatsDB);
     console.log(dolphinFlatsWeb === dolphinFlatsDB);
     console.log(westminsterFlatsWeb === westminsterFlatsDB);
 
@@ -59,7 +64,8 @@ function parseHTML(body) {
 }
 
 async function createTableEntry(client, tableName, flats) {
-  const id = uuidv4();
+  const id = Object.keys(JSON.parse(flats))[0];
+  console.log(id);
   const params = {
     TableName: tableName,
     Item: {
@@ -75,21 +81,40 @@ async function createTableEntry(client, tableName, flats) {
   }
 }
 
-async function readTableItems(client, tableName) {
+async function readTableItem(client, tableName, id) {
   const params = {
     TableName: tableName,
+    Key: {
+      "flatID": { S: id }
+    }
+  };
+  try {
+    const result = await client.send(new GetItemCommand(params));
+
+    console.log(result.Item.content.S)
+    console.log(`Read ${result.Item} items from ${tableName}`);
+    return result.Item.content.S;
+  } catch (err) {
+    console.error(`Unable to read items from ${tableName}: ${err}`);
+    return [];
+  }
+}
+
+async function checkEmptyTable(client, tableName, flats) {
+  const [dolphinFlatsWeb, westminsterFlatsWebs] = flats;
+  const params = {
+    TableName: tableName
   };
   try {
     const result = await client.send(new ScanCommand(params));
 
-    const dolphinJSON = result.Items[0].content.S
-    const westminsterJSON = result.Items[1].content.S
-
-    console.log(`Read ${result.Items} items from ${tableName}`);
-    return [dolphinJSON, westminsterJSON]
-  } catch (err) {
-    console.error(`Unable to read items from ${tableName}: ${err}`);
-    return [];
+    if (result.Items.length === 0) {
+      console.log("Table was empty, adding current flat data");
+      await createTableEntry(client, tableName, dolphinFlatsWeb);
+      await createTableEntry(client, tableName, westminsterFlatsWebs);
+    }
+  } catch(err) {
+    console.error(err);
   }
 }
 
