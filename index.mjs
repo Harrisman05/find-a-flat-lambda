@@ -1,6 +1,6 @@
 import { load } from 'cheerio';
 import fetch from 'node-fetch';
-import { DynamoDBClient, PutItemCommand, ScanCommand, GetItemCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient, PutItemCommand, ScanCommand, GetItemCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
 import { v4 as uuidv4 } from 'uuid';
 
 const client = new DynamoDBClient({ region: 'eu-north-1' });
@@ -33,20 +33,16 @@ async function getAvailableFlats() {
     /////////////////////////////////////////////////////////////////////////////////
 
     // Create data if table is empty
+    await checkEmptyTable(client, tableName, [dolphinFlatsWeb, westminsterFlatsWeb]);
 
-    // await checkEmptyTable(client, tableName, [dolphinFlatsWeb, westminsterFlatsWeb]);
+    // If there's data in table, extract each flats data 
+    const dolphinFlatsDB = await readTableItem(client, tableName, dolphinID);
+    const westminsterFlatsDB = await readTableItem(client, tableName, westminsterID);
 
-    // extract each flats data from DB to compare with Web API
-
-    // const dolphinFlatsDB = await readTableItem(client, tableName, dolphinID);
-    // const westminsterFlatsDB = await readTableItem(client, tableName, westminsterID);
-    
-    console.log(dolphinFlatsWeb);
-    console.log(westminsterFlatsWeb);
-    // console.log(dolphinFlatsDB);
-    // console.log(westminsterFlatsDB);
-    // console.log(dolphinFlatsWeb === dolphinFlatsDB);
-    // console.log(westminsterFlatsWeb === westminsterFlatsDB);
+    // start check - Check matching, then dolphin, then westminster
+    const allFlats = [dolphinFlatsWeb, dolphinFlatsDB, westminsterFlatsWeb, westminsterFlatsDB];
+    const allIDs = [dolphinID, westminsterID];
+    await checkMatchingData(client, tableName, allIDs, allFlats);
 
   } catch (error) {
     console.error(error);
@@ -94,8 +90,6 @@ async function readTableItem(client, tableName, id) {
   };
   try {
     const result = await client.send(new GetItemCommand(params));
-
-    console.log(result.Item.content.S)
     console.log(`Read ${result.Item} items from ${tableName}`);
     return result.Item.content.S;
   } catch (err) {
@@ -119,6 +113,47 @@ async function checkEmptyTable(client, tableName, flats) {
     }
   } catch(err) {
     console.error(err);
+  }
+}
+
+async function checkMatchingData(client, tableName, allIDs, allFlats) {
+  const [dolphinFlatsWeb, dolphinFlatsDB , westminsterFlatsWeb, westminsterFlatsDB] = allFlats;
+  const [dolphinID, westminsterID] = allIDs;
+
+  // If all data matches
+  if (dolphinFlatsWeb === dolphinFlatsDB && westminsterFlatsWeb === westminsterFlatsDB) {
+    console.log('All data matching, no updates to the website');
+    return;
+  }
+
+  // If Dolphin web data has been updated
+  if (dolphinFlatsWeb !== dolphinFlatsDB) {
+    console.log('New listing on Dolphin');
+    await updateTableItem(client, tableName, dolphinID, dolphinFlatsWeb);
+  }
+
+  // If Westminster web data has been updated
+  if (westminsterFlatsWeb !== westminsterFlatsDB) {
+    console.log('New listing on Homes for Westminster');
+    await updateTableItem(client, tableName, westminsterID, westminsterFlatsWeb);
+  }
+}
+
+async function updateTableItem(client, tableName, flatID, flatsWeb) {
+  const params = {
+    TableName: tableName,
+    Key: { flatID: { S: flatID } },
+    UpdateExpression: 'set content = :json',
+    ExpressionAttributeValues: {
+      ':json': { S: flatsWeb },
+    },
+  };
+
+  try {
+    const result = await client.send(new UpdateItemCommand(params));
+    console.log(`Item ${flatID} updated successfully in ${tableName}`);
+  } catch (err) {
+    console.error(`Error updating item ${flatID} in ${tableName}: ${err}`);
   }
 }
 
