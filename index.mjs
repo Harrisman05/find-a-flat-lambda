@@ -24,20 +24,20 @@ async function getAvailableFlats() {
     const $dolphin = load(dolphinBody);
     const $hfWestminster = load(hfWestminsterBody);
 
-    const dolphinFlats = JSON.stringify({ 'dolphin-flats': parseHTML($dolphin) });
-    const westminsterFlats = JSON.stringify({ 'westminster-flats': parseHTML($hfWestminster) });
+    const dolphinFlatsWeb = JSON.stringify({ 'dolphin-flats': parseHTML($dolphin) });
+    const westminsterFlatsWeb = JSON.stringify({ 'westminster-flats': parseHTML($hfWestminster) });
 
-    console.log(dolphinFlats);
-    console.log(westminsterFlats);
+    console.log(dolphinFlatsWeb);
+    console.log(westminsterFlatsWeb);
 
     // await createTableEntry(client, tableName, dolphinFlats);
     // await createTableEntry(client, tableName, westminsterFlats);
 
-    const [dolphinJSON, westminsterJSON] = await readTableItems(client, tableName);
-    console.log(dolphinJSON);
-    console.log(westminsterJSON);
-    console.log(dolphinJSON === dolphinFlats);
-    console.log(westminsterJSON === westminsterFlats);
+    const [dolphinFlatsDB, westminsterFlatsDB] = await readTableItems(client, tableName);
+    console.log(dolphinFlatsWeb);
+    console.log(westminsterFlatsWeb);
+    console.log(dolphinFlatsWeb === dolphinFlatsDB);
+    console.log(westminsterFlatsWeb === westminsterFlatsDB);
 
   } catch (error) {
     console.error(error);
