@@ -27,8 +27,8 @@ async function getAvailableFlats() {
     const $dolphin = load(dolphinBody);
     const $hfWestminster = load(hfWestminsterBody);
 
-    const dolphinFlatsWeb = JSON.stringify({ 'dolphin-flats': parseHTML($dolphin) });
-    const westminsterFlatsWeb = JSON.stringify({ 'westminster-flats': parseHTML($hfWestminster) });
+    const dolphinFlatsWeb = JSON.stringify({ [dolphinID] : parseHTML($dolphin) });
+    const westminsterFlatsWeb = JSON.stringify({ [westminsterID] : parseHTML($hfWestminster) });
 
     /////////////////////////////////////////////////////////////////////////////////
 
