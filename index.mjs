@@ -1,6 +1,6 @@
 import { load } from 'cheerio';
 import fetch from 'node-fetch';
-import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient, PutItemCommand, ScanCommand, TableAlreadyExistsException } from '@aws-sdk/client-dynamodb';
 import { v4 as uuidv4 } from 'uuid';
 
 const client = new DynamoDBClient({ region: 'eu-north-1' });
@@ -24,13 +24,21 @@ async function getAvailableFlats() {
     const $dolphin = load(dolphinBody);
     const $hfWestminster = load(hfWestminsterBody);
 
-    const dolphinFlats = { 'dolphin-flats': parseHTML($dolphin) };
-    const westminsterFlats = { 'westminster-flats': parseHTML($hfWestminster) };
+    const dolphinFlats = JSON.stringify({ 'dolphin-flats': parseHTML($dolphin) });
+    const westminsterFlats = JSON.stringify({ 'westminster-flats': parseHTML($hfWestminster) });
 
     console.log(dolphinFlats);
     console.log(westminsterFlats);
 
-    await createTableEntry(client, tableName, dolphinFlats);
+    // await createTableEntry(client, tableName, dolphinFlats);
+    // await createTableEntry(client, tableName, westminsterFlats);
+
+    const [dolphinJSON, westminsterJSON] = await readTableItems(client, tableName);
+    console.log(dolphinJSON);
+    console.log(westminsterJSON);
+    console.log(dolphinJSON === dolphinFlats);
+    console.log(westminsterJSON === westminsterFlats);
+
   } catch (error) {
     console.error(error);
   }
@@ -56,7 +64,7 @@ async function createTableEntry(client, tableName, flats) {
     TableName: tableName,
     Item: {
       flatID: { S: id },
-      content: { S: JSON.stringify(flats) },
+      content: { S: flats },
     },
   };
   try {
@@ -66,5 +74,24 @@ async function createTableEntry(client, tableName, flats) {
     console.error(`Unable to create item in ${tableName}: ${err}`);
   }
 }
+
+async function readTableItems(client, tableName) {
+  const params = {
+    TableName: tableName,
+  };
+  try {
+    const result = await client.send(new ScanCommand(params));
+
+    const dolphinJSON = result.Items[0].content.S
+    const westminsterJSON = result.Items[1].content.S
+
+    console.log(`Read ${result.Items} items from ${tableName}`);
+    return [dolphinJSON, westminsterJSON]
+  } catch (err) {
+    console.error(`Unable to read items from ${tableName}: ${err}`);
+    return [];
+  }
+}
+
 getAvailableFlats();
 export { getAvailableFlats };
