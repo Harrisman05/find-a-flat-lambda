@@ -32,17 +32,21 @@ async function getAvailableFlats() {
 
     /////////////////////////////////////////////////////////////////////////////////
 
-    await checkEmptyTable(client, tableName, [dolphinFlatsWeb, westminsterFlatsWeb]);
+    // Create data if table is empty
 
-    const dolphinFlatsDB = await readTableItem(client, tableName, dolphinID);
-    const westminsterFlatsDB = await readTableItem(client, tableName, westminsterID);
+    // await checkEmptyTable(client, tableName, [dolphinFlatsWeb, westminsterFlatsWeb]);
+
+    // extract each flats data from DB to compare with Web API
+
+    // const dolphinFlatsDB = await readTableItem(client, tableName, dolphinID);
+    // const westminsterFlatsDB = await readTableItem(client, tableName, westminsterID);
     
     console.log(dolphinFlatsWeb);
     console.log(westminsterFlatsWeb);
-    console.log(dolphinFlatsDB);
-    console.log(westminsterFlatsDB);
-    console.log(dolphinFlatsWeb === dolphinFlatsDB);
-    console.log(westminsterFlatsWeb === westminsterFlatsDB);
+    // console.log(dolphinFlatsDB);
+    // console.log(westminsterFlatsDB);
+    // console.log(dolphinFlatsWeb === dolphinFlatsDB);
+    // console.log(westminsterFlatsWeb === westminsterFlatsDB);
 
   } catch (error) {
     console.error(error);
