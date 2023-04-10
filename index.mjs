@@ -1,10 +1,11 @@
 import { load } from 'cheerio';
 import fetch from 'node-fetch';
 import { DynamoDBClient, PutItemCommand, ScanCommand, GetItemCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
-import { v4 as uuidv4 } from 'uuid';
+import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
 
 const client = new DynamoDBClient({ region: 'eu-north-1' });
 const tableName = 'westminster_flats_table';
+const snsClient = new SNSClient({ region: "eu-north-1" });
 
 async function getAvailableFlats() {
   try {
@@ -42,7 +43,7 @@ async function getAvailableFlats() {
     // start check - Check matching, then dolphin, then westminster
     const allFlats = [dolphinFlatsWeb, dolphinFlatsDB, westminsterFlatsWeb, westminsterFlatsDB];
     const allIDs = [dolphinID, westminsterID];
-    await checkMatchingData(client, tableName, allIDs, allFlats);
+    await checkMatchingData(client, tableName, allIDs, allFlats, snsClient);
 
   } catch (error) {
     console.error(error);
@@ -116,26 +117,28 @@ async function checkEmptyTable(client, tableName, flats) {
   }
 }
 
-async function checkMatchingData(client, tableName, allIDs, allFlats) {
+async function checkMatchingData(client, tableName, allIDs, allFlats, snsClient) {
   const [dolphinFlatsWeb, dolphinFlatsDB , westminsterFlatsWeb, westminsterFlatsDB] = allFlats;
   const [dolphinID, westminsterID] = allIDs;
 
   // If all data matches
   if (dolphinFlatsWeb === dolphinFlatsDB && westminsterFlatsWeb === westminsterFlatsDB) {
-    console.log('All data matching, no updates to the website');
+    console.log('All data matching, no updates to the websites');
     return;
   }
 
   // If Dolphin web data has been updated
   if (dolphinFlatsWeb !== dolphinFlatsDB) {
-    console.log('New listing on Dolphin');
+    console.log('New listing on Dolphin!');
     await updateTableItem(client, tableName, dolphinID, dolphinFlatsWeb);
+    await sendSMS(snsClient, dolphinID);
   }
 
   // If Westminster web data has been updated
   if (westminsterFlatsWeb !== westminsterFlatsDB) {
-    console.log('New listing on Homes for Westminster');
+    console.log('New listing on Homes for Westminster!');
     await updateTableItem(client, tableName, westminsterID, westminsterFlatsWeb);
+    await sendSMS(snsClient, westminsterID);
   }
 }
 
@@ -155,6 +158,23 @@ async function updateTableItem(client, tableName, flatID, flatsWeb) {
   } catch (err) {
     console.error(`Error updating item ${flatID} in ${tableName}: ${err}`);
   }
+}
+
+async function sendSMS(client, flatID) {
+  const snsClient = new SNSClient({ region: "eu-north-1" });
+  try {
+  const message = `SNS from Amazon. New listing on ${flatID}!`;
+  const params = {
+    Message: message,
+    TopicArn: 'arn:aws:sns:eu-north-1:280605792080:westminster_flats_topic',
+    TopicName: 'westminster_flats_topic'
+  }
+  const command = new PublishCommand(params);
+  await snsClient.send(command);
+  console.log(`Send SNS notification: ${message}`);
+} catch (err) {
+  console.error(`Unable to send text message: ${err}`)
+}
 }
 
 getAvailableFlats();
