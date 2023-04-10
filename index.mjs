@@ -5,7 +5,6 @@ import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
 
 const client = new DynamoDBClient({ region: 'eu-north-1' });
 const tableName = 'westminster_flats_table';
-const snsClient = new SNSClient({ region: "eu-north-1" });
 
 async function getAvailableFlats() {
   try {
@@ -43,7 +42,7 @@ async function getAvailableFlats() {
     // start check - Check matching, then dolphin, then westminster
     const allFlats = [dolphinFlatsWeb, dolphinFlatsDB, westminsterFlatsWeb, westminsterFlatsDB];
     const allIDs = [dolphinID, westminsterID];
-    await checkMatchingData(client, tableName, allIDs, allFlats, snsClient);
+    await checkMatchingData(client, tableName, allIDs, allFlats);
 
   } catch (error) {
     console.error(error);
@@ -117,13 +116,14 @@ async function checkEmptyTable(client, tableName, flats) {
   }
 }
 
-async function checkMatchingData(client, tableName, allIDs, allFlats, snsClient) {
+async function checkMatchingData(client, tableName, allIDs, allFlats) {
   const [dolphinFlatsWeb, dolphinFlatsDB , westminsterFlatsWeb, westminsterFlatsDB] = allFlats;
   const [dolphinID, westminsterID] = allIDs;
 
   // If all data matches
   if (dolphinFlatsWeb === dolphinFlatsDB && westminsterFlatsWeb === westminsterFlatsDB) {
     console.log('All data matching, no updates to the websites');
+    await sendSMS();
     return;
   }
 
@@ -131,14 +131,14 @@ async function checkMatchingData(client, tableName, allIDs, allFlats, snsClient)
   if (dolphinFlatsWeb !== dolphinFlatsDB) {
     console.log('New listing on Dolphin!');
     await updateTableItem(client, tableName, dolphinID, dolphinFlatsWeb);
-    await sendSMS(snsClient, dolphinID);
+    await sendSMS(dolphinID);
   }
 
   // If Westminster web data has been updated
   if (westminsterFlatsWeb !== westminsterFlatsDB) {
     console.log('New listing on Homes for Westminster!');
     await updateTableItem(client, tableName, westminsterID, westminsterFlatsWeb);
-    await sendSMS(snsClient, westminsterID);
+    await sendSMS(westminsterID);
   }
 }
 
@@ -160,10 +160,13 @@ async function updateTableItem(client, tableName, flatID, flatsWeb) {
   }
 }
 
-async function sendSMS(client, flatID) {
+async function sendSMS(flatID = null) {
   const snsClient = new SNSClient({ region: "eu-north-1" });
+  const message = flatID
+  ? `SNS from Amazon. New listing on ${flatID}! - ${new Date(Date.now()).toLocaleString()}`
+  : `SNS from Amazon. No new listings ${new Date(Date.now()).toLocaleString()}`;
+
   try {
-  const message = `SNS from Amazon. New listing on ${flatID}!`;
   const params = {
     Message: message,
     TopicArn: 'arn:aws:sns:eu-north-1:280605792080:westminster_flats_topic',
@@ -171,7 +174,7 @@ async function sendSMS(client, flatID) {
   }
   const command = new PublishCommand(params);
   await snsClient.send(command);
-  console.log(`Send SNS notification: ${message}`);
+  console.log(`Sent SNS notification: ${message}`);
 } catch (err) {
   console.error(`Unable to send text message: ${err}`)
 }
