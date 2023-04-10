@@ -180,5 +180,5 @@ async function sendSMS(flatID = null) {
 }
 }
 
-getAvailableFlats();
+// getAvailableFlats();
 export { getAvailableFlats };
