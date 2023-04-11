@@ -1,7 +1,8 @@
 import { load } from 'cheerio';
 import fetch from 'node-fetch';
 import { DynamoDBClient, PutItemCommand, ScanCommand, GetItemCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
-import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
+import { SESClient, CloneReceiptRuleSetCommand } from "@aws-sdk/client-ses";
+
 
 const client = new DynamoDBClient({ region: 'eu-north-1' });
 const tableName = 'westminster_flats_table';
@@ -131,14 +132,12 @@ async function checkMatchingData(client, tableName, allIDs, allFlats) {
   if (dolphinFlatsWeb !== dolphinFlatsDB) {
     console.log('New listing on Dolphin!');
     await updateTableItem(client, tableName, dolphinID, dolphinFlatsWeb);
-    await sendSMS(dolphinID);
   }
 
   // If Westminster web data has been updated
   if (westminsterFlatsWeb !== westminsterFlatsDB) {
     console.log('New listing on Homes for Westminster!');
     await updateTableItem(client, tableName, westminsterID, westminsterFlatsWeb);
-    await sendSMS(westminsterID);
   }
 }
 
@@ -160,25 +159,7 @@ async function updateTableItem(client, tableName, flatID, flatsWeb) {
   }
 }
 
-async function sendSMS(flatID = null) {
-  const snsClient = new SNSClient({ region: "eu-north-1" });
-  const message = flatID
-  ? `SNS from Amazon. New listing on ${flatID}! - ${new Date(Date.now()).toLocaleString()}`
-  : `SNS from Amazon. No new listings ${new Date(Date.now()).toLocaleString()}`;
 
-  try {
-  const params = {
-    Message: message,
-    TopicArn: 'arn:aws:sns:eu-north-1:280605792080:westminster_flats_topic',
-    TopicName: 'westminster_flats_topic'
-  }
-  const command = new PublishCommand(params);
-  await snsClient.send(command);
-  console.log(`Sent SNS notification: ${message}`);
-} catch (err) {
-  console.error(`Unable to send text message: ${err}`)
-}
-}
 
 // getAvailableFlats();
 export { getAvailableFlats };
