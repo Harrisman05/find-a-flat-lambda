@@ -1,7 +1,8 @@
 import { load } from 'cheerio';
 import fetch from 'node-fetch';
 import { DynamoDBClient, PutItemCommand, ScanCommand, GetItemCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
-import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
+import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+
 
 const client = new DynamoDBClient({ region: 'eu-north-1' });
 const tableName = 'westminster_flats_table';
@@ -123,7 +124,7 @@ async function checkMatchingData(client, tableName, allIDs, allFlats) {
   // If all data matches
   if (dolphinFlatsWeb === dolphinFlatsDB && westminsterFlatsWeb === westminsterFlatsDB) {
     console.log('All data matching, no updates to the websites');
-    await sendSMS();
+    await sendSES();
     return;
   }
 
@@ -131,14 +132,14 @@ async function checkMatchingData(client, tableName, allIDs, allFlats) {
   if (dolphinFlatsWeb !== dolphinFlatsDB) {
     console.log('New listing on Dolphin!');
     await updateTableItem(client, tableName, dolphinID, dolphinFlatsWeb);
-    await sendSMS(dolphinID);
+    await sendSES(dolphinID);
   }
 
   // If Westminster web data has been updated
   if (westminsterFlatsWeb !== westminsterFlatsDB) {
     console.log('New listing on Homes for Westminster!');
     await updateTableItem(client, tableName, westminsterID, westminsterFlatsWeb);
-    await sendSMS(westminsterID);
+    await sendSES(westminsterID);
   }
 }
 
@@ -160,25 +161,38 @@ async function updateTableItem(client, tableName, flatID, flatsWeb) {
   }
 }
 
-async function sendSMS(flatID = null) {
-  const snsClient = new SNSClient({ region: "eu-north-1" });
-  const message = flatID
-  ? `SNS from Amazon. New listing on ${flatID}! - ${new Date(Date.now()).toLocaleString()}`
-  : `SNS from Amazon. No new listings ${new Date(Date.now()).toLocaleString()}`;
+async function sendSES(flatID = null) {
+// Create an SES client
+const sesClient = new SESClient({ region: "eu-north-1" }); // Replace with your desired AWS region
+const message = flatID
+? `SES from Amazon. New listing on ${flatID}! - ${new Date(Date.now()).toLocaleString()}`
+: `SES from Amazon. No new listings ${new Date(Date.now()).toLocaleString()}`;
 
-  try {
-  const params = {
-    Message: message,
-    TopicArn: 'arn:aws:sns:eu-north-1:280605792080:westminster_flats_topic',
-    TopicName: 'westminster_flats_topic'
-  }
-  const command = new PublishCommand(params);
-  await snsClient.send(command);
-  console.log(`Sent SNS notification: ${message}`);
+// Define the parameters for the SendEmailCommand
+const params = {
+  Source: process.env.SENDER_EMAIL_ADDRESS,
+  Destination: {
+    ToAddresses: [process.env.RECEIVER_EMAIL_ADDRESS],
+  },
+  Message: {
+    Subject: {
+      Data: message,
+    },
+    Body: {
+      Text: {
+        Data: message, 
+      },
+    },
+  },
+};
+
+try {
+  const data = await sesClient.send(new SendEmailCommand(params));
+  console.log("Email sent successfully", data);
 } catch (err) {
-  console.error(`Unable to send text message: ${err}`)
+  console.error("Failed to send email:", err);
 }
 }
 
-// getAvailableFlats();
+getAvailableFlats();
 export { getAvailableFlats };
