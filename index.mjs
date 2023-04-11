@@ -1,7 +1,7 @@
 import { load } from 'cheerio';
 import fetch from 'node-fetch';
 import { DynamoDBClient, PutItemCommand, ScanCommand, GetItemCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
-import { SESClient, CloneReceiptRuleSetCommand } from "@aws-sdk/client-ses";
+import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 
 
 const client = new DynamoDBClient({ region: 'eu-north-1' });
@@ -124,7 +124,7 @@ async function checkMatchingData(client, tableName, allIDs, allFlats) {
   // If all data matches
   if (dolphinFlatsWeb === dolphinFlatsDB && westminsterFlatsWeb === westminsterFlatsDB) {
     console.log('All data matching, no updates to the websites');
-    await sendSMS();
+    await sendSES();
     return;
   }
 
@@ -132,12 +132,14 @@ async function checkMatchingData(client, tableName, allIDs, allFlats) {
   if (dolphinFlatsWeb !== dolphinFlatsDB) {
     console.log('New listing on Dolphin!');
     await updateTableItem(client, tableName, dolphinID, dolphinFlatsWeb);
+    await sendSES(dolphinID);
   }
 
   // If Westminster web data has been updated
   if (westminsterFlatsWeb !== westminsterFlatsDB) {
     console.log('New listing on Homes for Westminster!');
     await updateTableItem(client, tableName, westminsterID, westminsterFlatsWeb);
+    await sendSES(westminsterID);
   }
 }
 
@@ -159,7 +161,38 @@ async function updateTableItem(client, tableName, flatID, flatsWeb) {
   }
 }
 
+async function sendSES(flatID = null) {
+// Create an SES client
+const sesClient = new SESClient({ region: "eu-north-1" }); // Replace with your desired AWS region
+const message = flatID
+? `SES from Amazon. New listing on ${flatID}! - ${new Date(Date.now()).toLocaleString()}`
+: `SES from Amazon. No new listings ${new Date(Date.now()).toLocaleString()}`;
 
+// Define the parameters for the SendEmailCommand
+const params = {
+  Source: process.env.SENDER_EMAIL_ADDRESS,
+  Destination: {
+    ToAddresses: [process.env.RECEIVER_EMAIL_ADDRESS],
+  },
+  Message: {
+    Subject: {
+      Data: message,
+    },
+    Body: {
+      Text: {
+        Data: message, 
+      },
+    },
+  },
+};
 
-// getAvailableFlats();
+try {
+  const data = await sesClient.send(new SendEmailCommand(params));
+  console.log("Email sent successfully", data);
+} catch (err) {
+  console.error("Failed to send email:", err);
+}
+}
+
+getAvailableFlats();
 export { getAvailableFlats };
