@@ -198,5 +198,5 @@ try {
 }
 }
 
-getAvailableFlats();
+// getAvailableFlats();
 export { getAvailableFlats };
