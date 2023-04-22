@@ -164,8 +164,12 @@ async function updateTableItem(client, tableName, flatID, flatsWeb) {
 async function sendSES(flatID = null) {
 // Create an SES client
 const sesClient = new SESClient({ region: "eu-north-1" }); // Replace with your desired AWS region
+const newFlatUrl = {
+  'dolphin-flats': 'https://www.dolphinliving.com/find-a-home/available-homes',
+  'westminster-flats': 'https://www.homesforwestminster.co.uk/category/property-for-rent'
+}
 const message = flatID
-? `SES from Amazon. New listing on ${flatID}! - ${new Date(Date.now()).toLocaleString()}`
+? `SES from Amazon. New listing on ${flatID}! ${newFlatUrl[flatID]} - ${new Date(Date.now()).toLocaleString()}`
 : `SES from Amazon. No new listings ${new Date(Date.now()).toLocaleString()}`;
 
 // Define the parameters for the SendEmailCommand
